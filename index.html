@@ -1,21 +1,82 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Eco-Detective: Desafío Local</title>
-     <script>
-        // MODO DISEÑADOR: Cambia a true si quieres que al hacer clic te diga las coordenadas (X, Y) para configurar tus imágenes reales
+    <title>Eco-Detective: Desafío de Impactos</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #eef2f7; padding: 20px; color: #2c3e50; }
+        .pantalla { display: none; background: white; max-width: 850px; margin: 20px auto; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        #contenedor-juego { position: relative; display: inline-block; margin-top: 15px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        #imagen-escenario { display: block; max-width: 100%; height: auto; cursor: crosshair; background-color: #ddd; min-width: 600px; min-height: 400px; }
+        .marcador { position: absolute; border: 4px solid; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        .correcto { border-color: #27ae60; background: rgba(39, 174, 96, 0.2); }
+        .incorrecto { border-color: #c0392b; background: rgba(192, 57, 43, 0.2); }
+        input, button { padding: 12px 20px; font-size: 16px; margin: 10px; border-radius: 6px; border: 1px solid #ccc; outline: none; }
+        button { background: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        button:hover { background: #219653; }
+        #cronometro { font-size: 24px; font-weight: bold; color: #e74c3c; margin: 10px 0; }
+        table { margin: 25px auto; border-collapse: collapse; width: 100%; max-width: 500px; background: white; }
+        th, td { padding: 14px; border-bottom: 1px solid #e0e0e0; text-align: center; }
+        th { background-color: #34495e; color: white; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f9fbfd; }
+        #alerta-penalizacion { color: #c0392b; font-weight: bold; display: none; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <!-- PANTALLA 1: INGRESO DE JUGADOR -->
+    <div id="pantalla-inicio" class="pantalla" style="display: block;">
+        <h1>🌱 Eco-Detective</h1>
+        <p>Encuentra los impactos ambientales en oficinas, terrazas y hogares lo más rápido posible.</p>
+        <p>Ingresa tu nombre para registrar tu tiempo en el ranking:</p>
+        <input type="text" id="nombre-jugador" placeholder="Tu nombre o alias" maxlength="15">
+        <br>
+        <button id="btn-iniciar">Comenzar Desafío</button>
+    </div>
+
+    <!-- PANTALLA 2: AREA DE JUEGO -->
+    <div id="pantalla-juego" class="pantalla">
+        <h2 id="info-nivel">Cargando...</h2>
+        <div id="cronometro">0.00s</div>
+        <div id="alerta-penalizacion">¡Error! +3 segundos</div>
+        <div id="contenedor-juego">
+            <img id="imagen-escenario" src="" alt="Cargando escenario ambiental...">
+        </div>
+        <p id="mensaje">Cargando escenario...</p>
+        <button id="btn-siguiente" style="display:none;">Siguiente Nivel</button>
+    </div>
+
+    <!-- PANTALLA 3: RANKING GLOBAL SIMULADO -->
+    <div id="pantalla-ranking" class="pantalla">
+        <h1>🏆 Tabla de Clasificación</h1>
+        <p>Los tiempos más rápidos guardados en esta sesión:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Posición</th>
+                    <th>Detective</th>
+                    <th>Tiempo Total</th>
+                </tr>
+            </thead>
+            <tbody id="cuerpo-tabla">
+                <!-- Se llena mediante JavaScript interno -->
+            </tbody>
+        </table>
+        <button id="btn-reiniciar">Volver a Jugar</button>
+    </div>
+
+    <script>
+        // MODO DISEÑADOR: Cambia a true si quieres ver las coordenadas (X, Y) en la consola al hacer clic
         const MODO_DISEÑADOR = true; 
 
-        // CONFIGURACIÓN AVANZADA DE NIVELES Y MÚLTIPLES IMPACTOS
+        // CONFIGURACIÓN DE NIVELES E IMPACTOS REALES
         const niveles = [
             {
                 nivel: 1,
                 entorno: "Oficina",
-                imagen: "oficina1.png", // Asegúrate de que coincida con el nombre y extensión de tu archivo
-                impactosRequeridos: 4, // Cuántos debe encontrar para ganar este nivel
+                imagen: "oficina1.jpg", 
+                impactosRequeridos: 3, 
                 impactos: [
                     { nombre: "Luz encendida en espacio vacío", X: 50, Y: 15, radio: 8, encontrado: false },
                     { nombre: "Computador encendido sin usuario", X: 30, Y: 45, radio: 7, encontrado: false },
@@ -28,8 +89,8 @@
             {
                 nivel: 2,
                 entorno: "Terraza",
-                imagen: "terraza.png",
-                impactosRequeridos: 5,
+                imagen: "terraza.jpg",
+                impactosRequeridos: 3,
                 impactos: [
                     { nombre: "Vaso desechable utilizado", X: 20, Y: 50, radio: 6, encontrado: false },
                     { nombre: "Alimento desperdiciado", X: 35, Y: 55, radio: 7, encontrado: false },
@@ -44,8 +105,8 @@
             {
                 nivel: 3,
                 entorno: "Hogar",
-                imagen: "hogar.png",
-                impactosRequeridos: 6,
+                imagen: "hogar.jpg",
+                impactosRequeridos: 3,
                 impactos: [
                     { nombre: "Luz encendida innecesariamente", X: 45, Y: 12, radio: 8, encontrado: false },
                     { nombre: "Monitor encendido", X: 28, Y: 40, radio: 7, encontrado: false },
@@ -72,9 +133,9 @@
         let penalizacionTiempo = 0;
 
         let rankingLocal = [
-            { nombre: "EcoMaster", tiempo: 45.20 },
-            { nombre: "GreenSpy", tiempo: 58.15 },
-            { nombre: "PlanetaSalvo", tiempo: 72.40 }
+            { nombre: "EcoMaster", tiempo: 32.40 },
+            { nombre: "GreenSpy", tiempo: 45.15 },
+            { nombre: "PlanetaSalvo", tiempo: 58.80 }
         ];
 
         document.getElementById("btn-iniciar").onclick = iniciarJuego;
@@ -101,9 +162,7 @@
             document.getElementById("info-nivel").innerText = `Nivel ${datosNivel.nivel}: ${datosNivel.entorno}`;
             document.getElementById("imagen-escenario").src = datosNivel.imagen;
             
-            // Reiniciar estado de impactos para este intento
             datosNivel.impactos.forEach(imp => imp.encontrado = false);
-            
             actualizarMensajeObjetivos();
             document.querySelectorAll('.marcador').forEach(m => m.remove());
 
@@ -117,31 +176,26 @@
 
         function actualizarMensajeObjetivos() {
             const datosNivel = niveles[nivelActual];
-            document.getElementById("mensaje").innerHTML = `<strong>Objetivo:</strong> Encuentra ${datosNivel.impactosRequeridos} impactos ambientales en la imagen.<br>Llevas: <strong>${encontradosEnNivel} de ${datosNivel.impactosRequeridos}</strong>`;
+            document.getElementById("mensaje").innerHTML = `<strong>Objetivo:</strong> Encuentra ${datosNivel.impactosRequeridos} impactos ambientales.<br>Llevas: <strong>${encontradosEnNivel} de ${datosNivel.impactosRequeridos}</strong>`;
         }
 
         function registrarClic(event) {
             const img = document.getElementById("imagen-escenario");
             const rect = img.getBoundingClientRect();
-            const clickX = ((event.clientX - rect.left) / rect.width) * 100;
+const clickX = ((event.clientX - rect.left) / rect.width) * 100;
             const clickY = ((event.clientY - rect.top) / rect.height) * 100;
 
-            // Ayuda en Modo Diseñador para configurar tus fotos reales
             if (MODO_DISEÑADOR) {
                 console.log(`Clic detectado en -> X: ${clickX.toFixed(1)}, Y: ${clickY.toFixed(1)}`);
             }
 
             const datosNivel = niveles[nivelActual];
-            
-            // Si ya completó los requeridos en este nivel, ignorar más clics hasta que avance
             if (encontradosEnNivel >= datosNivel.impactosRequeridos) return;
 
             let impactoDetectado = null;
 
-            // Buscar si el clic colisionó con algún impacto de la lista
             for (let imp of datosNivel.impactos) {
-                if (imp.encontrado) continue; // Ignorar si ya se descubrió antes
-
+                if (imp.encontrado) continue;
                 let distancia = Math.sqrt(Math.pow(clickX - imp.X, 2) + Math.pow(clickY - imp.Y, 2));
                 if (distancia <= imp.radio) {
                     impactoDetectado = imp;
@@ -155,7 +209,6 @@
             marcador.style.top = `${clickY}%`;
 
             if (impactoDetectado) {
-                // ¡Acierto!
                 impactoDetectado.encontrado = true;
                 encontradosEnNivel++;
                 
@@ -166,7 +219,6 @@
                 alert(`¡Excelente! Encontraste: ${impactoDetectado.nombre}`);
                 actualizarMensajeObjetivos();
 
-                // Comprobar si ya ganó el nivel entero
                 if (encontradosEnNivel >= datosNivel.impactosRequeridos) {
                     clearInterval(intervaloTiempo);
                     let tiempoNivel = (performance.now() - tiempoInicio) / 1000;
@@ -176,13 +228,12 @@
                     document.getElementById("btn-siguiente").style.display = "inline-block";
                 }
             } else {
-                // ¡Fallo! Clic incorrecto
                 penalizacionTiempo += 3;
                 mostrarAlertaPenalizacion();
                 
                 marcador.classList.add("incorrecto");
-                marcador.style.width = "6%"; // Tamaño estándar para el error
-                marcador.style.height = `${6 * (rect.width / rect.height)}%`;
+                marcador.style.width = "4%";
+                marcador.style.height = `${4 * (rect.width / rect.height)}%`;
             }
             document.getElementById("contenedor-juego").appendChild(marcador);
         }
@@ -203,14 +254,11 @@
         }
 
         function guardarPuntajeLocal() {
-   function guardarPuntajeLocal() {
             let tiempoFinal = tiempoTotalAcumulado + penalizacionTiempo;
-            
             rankingLocal.push({
                 nombre: nombreJugador,
                 tiempo: parseFloat(tiempoFinal.toFixed(2))
             });
-
             rankingLocal.sort((a, b) => a.tiempo - b.tiempo);
             actualizarTablaHTML();
             cambiarPantalla("pantalla-ranking");
