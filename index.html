@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Eco-Detective: Desafío Firebase</title>
+    <title>Eco-Detective: Desafío Local</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #eef2f7; padding: 20px; color: #2c3e50; }
         .pantalla { display: none; background: white; max-width: 850px; margin: 20px auto; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
@@ -28,9 +29,9 @@
 
     <!-- PANTALLA 1: INGRESO DE JUGADOR -->
     <div id="pantalla-inicio" class="pantalla" style="display: block;">
-        <h1>🌱 Eco-Detective Online</h1>
+        <h1>🌱 Eco-Detective Local</h1>
         <p>Encuentra los impactos ambientales en oficinas y hogares lo más rápido posible.</p>
-        <p>Ingresa tu nombre para registrar tu tiempo en el ranking global:</p>
+        <p>Ingresa tu nombre para registrar tu tiempo en el ranking:</p>
         <input type="text" id="nombre-jugador" placeholder="Tu nombre o alias" maxlength="15">
         <br>
         <button id="btn-iniciar">Comenzar Desafío</button>
@@ -48,10 +49,10 @@
         <button id="btn-siguiente" style="display:none;">Siguiente Nivel</button>
     </div>
 
-    <!-- PANTALLA 3: RANKING GLOBAL EN TIEMPO REAL -->
+    <!-- PANTALLA 3: RANKING GLOBAL SIMULADO (SIN APIS EXTERNAS) -->
     <div id="pantalla-ranking" class="pantalla">
-        <h1>🏆 Tabla de Clasificación Global</h1>
-        <p>Los 10 tiempos más rápidos en completar todos los niveles:</p>
+        <h1>🏆 Tabla de Clasificación</h1>
+        <p>Los tiempos más rápidos guardados en esta sesión:</p>
         <table>
             <thead>
                 <tr>
@@ -61,38 +62,14 @@
                 </tr>
             </thead>
             <tbody id="cuerpo-tabla">
-                <tr><td colspan="3">Sincronizando con Firebase...</td></tr>
+                <!-- Se llena mediante JavaScript interno -->
             </tbody>
         </table>
         <button id="btn-reiniciar">Volver a Jugar</button>
     </div>
 
-    <!-- INTEGRACIÓN DE CONFIGURACIÓN Y LÓGICA DE FIREBASE -->
-   <!-- LIBRERÍAS CLÁSICAS DE FIREBASE (A PRUEBA DE BLOQUEOS CORS) -->
-    <script src="https://gstatic.com"></script>
-    <script src="https://gstatic.com"></script>
-
     <script>
-        // ==========================================
-        // REEMPLAZA ESTOS DATOS CON TU PROYECTO DE FIREBASE
-        // ==========================================
-        const firebaseConfig = {
-            apiKey: "TU_API_KEY",
-            authDomain: "TU_://firebaseapp.com",
-            databaseURL: "https://TU_://firebaseio.com",
-            projectId: "TU_PROYECTO",
-            storageBucket: "TU_://appspot.com",
-            messagingSenderId: "TU_ID",
-            appId: "TU_APP_ID"
-        };
-
-        // Inicializar Firebase clásico
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-
-        // ==========================================
         // CONFIGURACIÓN DE LOS IMPACTOS (X, Y en %)
-        // ==========================================
         const niveles = [
             { nivel: 1, impactoX: 50, impactoY: 30, radioPermitido: 12, pista: "Busca luces encendidas innecesariamente en la oficina de día.", imagen: "https://picsum.photos" },
             { nivel: 2, impactoX: 75, impactoY: 60, radioPermitido: 8, pista: "Busca un grifo goteando y desperdiciando agua en el hogar.", imagen: "https://picsum.photos" },
@@ -107,7 +84,13 @@
         let tiempoTotalAcumulado = 0;
         let penalizacionTiempo = 0;
 
-        // Asignar funciones a los botones manualmente
+        // Base de datos local simulada en la memoria del navegador
+        let rankingLocal = [
+            { nombre: "EcoMaster", tiempo: 15.40 },
+            { nombre: "GreenSpy", tiempo: 22.15 },
+            { nombre: "PlanetaSalvo", tiempo: 35.80 }
+        ];
+
         document.getElementById("btn-iniciar").onclick = iniciarJuego;
         document.getElementById("btn-siguiente").onclick = siguienteNivel;
         document.getElementById("btn-reiniciar").onclick = reiniciarTodo;
@@ -190,48 +173,44 @@
                 nivelActual++;
                 cargarNivel();
             } else {
-                guardarPuntajeFirebase();
+                guardarPuntajeLocal();
             }
         }
 
-        function guardarPuntajeFirebase() {
-            document.getElementById("mensaje").innerText = "Subiendo tu registro al ranking global de la nube...";
+        function guardarPuntajeLocal() {
             let tiempoFinal = tiempoTotalAcumulado + penalizacionTiempo;
-
-            db.ref('ranking').push({
+            
+            // Añadir el puntaje del jugador actual al arreglo de la memoria
+            rankingLocal.push({
                 nombre: nombreJugador,
-                tiempo: parseFloat(tiempoFinal.toFixed(2)),
-                fecha: new Date().toISOString()
-            }).then(() => {
-                cambiarPantalla("pantalla-ranking");
-            }).catch((error) => {
-                console.error("Error Firebase:", error);
-                cambiarPantalla("pantalla-ranking");
+                tiempo: parseFloat(tiempoFinal.toFixed(2))
             });
+
+            // Ordenar de menor a mayor tiempo
+            rankingLocal.sort((a, b) => a.tiempo - b.tiempo);
+
+            actualizarTablaHTML();
+            cambiarPantalla("pantalla-ranking");
         }
 
-        // Cargar y ordenar Top 10 en tiempo real usando Firebase clásico
-        db.ref('ranking').orderByChild('tiempo').limitToFirst(10).on('value', (snapshot) => {
+        function actualizarTablaHTML() {
             const tbody = document.getElementById("cuerpo-tabla");
             tbody.innerHTML = "";
             
-            if (!snapshot.exists()) {
-                tbody.innerHTML = "<tr><td colspan='3'>¡Sé el primero en establecer un récord!</td></tr>";
-                return;
-            }
-
-            let posicion = 1;
-            snapshot.forEach((childSnapshot) => {
-                const registro = childSnapshot.val();
+            // Mostrar solo los mejores 10 tiempos
+            const top10 = rankingLocal.slice(0, 10);
+            
+            top10.forEach((registro, indice) => {
+                let puesto = indice + 1;
                 tbody.innerHTML += `
                     <tr>
-                        <td>${posicion === 1 ? '🥇 1' : posicion === 2 ? '🥈 2' : posicion === 3 ? '🥉 3' : posicion}</td>
+                        <td>${puesto === 1 ? '🥇 1' : puesto === 2 ? '🥈 2' : puesto === 3 ? '🥉 3' : puesto}</td>
+    <td>${puesto === 1 ? '🥇 1' : puesto === 2 ? '🥈 2' : puesto === 3 ? '🥉 3' : puesto}</td>
                         <td><strong>${registro.nombre}</strong></td>
                         <td>${registro.tiempo.toFixed(2)}s</td>
                     </tr>`;
-                posicion++;
             });
-        });
+        }
 
         function cambiarPantalla(idPantalla) {
             document.querySelectorAll('.pantalla').forEach(p => p.style.display = 'none');
