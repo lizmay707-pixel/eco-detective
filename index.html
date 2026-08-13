@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eco-Detective: Desafío Firebase</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background: #eef2f7; padding: 20px; color: #2c3e50; }
+        .pantalla { display: none; background: white; max-width: 850px; margin: 20px auto; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        #contenedor-juego { position: relative; display: inline-block; margin-top: 15px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        #imagen-escenario { display: block; max-width: 100%; height: auto; cursor: crosshair; }
+        .marcador { position: absolute; border: 4px solid; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+        .correcto { border-color: #27ae60; background: rgba(39, 174, 96, 0.2); }
+        .incorrecto { border-color: #c0392b; background: rgba(192, 57, 43, 0.2); }
+        input, button { padding: 12px 20px; font-size: 16px; margin: 10px; border-radius: 6px; border: 1px solid #ccc; outline: none; }
+        button { background: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        button:hover { background: #219653; }
+        #cronometro { font-size: 24px; font-weight: bold; color: #e74c3c; margin: 10px 0; }
+        table { margin: 25px auto; border-collapse: collapse; width: 100%; max-width: 500px; background: white; }
+        th, td { padding: 14px; border-bottom: 1px solid #e0e0e0; text-align: center; }
+        th { background-color: #34495e; color: white; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f9fbfd; }
+        #alerta-penalizacion { color: #c0392b; font-weight: bold; display: none; margin-top: 5px; animation: flash 0.5s; }
+        @keyframes flash { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <!-- PANTALLA 1: INGRESO DE JUGADOR -->
+    <div id="pantalla-inicio" class="pantalla" style="display: block;">
+        <h1>🌱 Eco-Detective Online</h1>
+        <p>Encuentra los impactos ambientales en oficinas y hogares lo más rápido posible.</p>
+        <p>Ingresa tu nombre para registrar tu tiempo en el ranking global:</p>
+        <input type="text" id="nombre-jugador" placeholder="Tu nombre o alias" maxlength="15">
+        <br>
+        <button id="btn-iniciar">Comenzar Desafío</button>
+    </div>
+
+    <!-- PANTALLA 2: AREA DE JUEGO -->
+    <div id="pantalla-juego" class="pantalla">
+        <h2 id="info-nivel">Nivel 1</h2>
+        <div id="cronometro">0.00s</div>
+        <div id="alerta-penalizacion">¡Error! +3 segundos</div>
+        <div id="contenedor-juego">
+            <img id="imagen-escenario" src="" alt="Escenario">
+        </div>
+        <p id="mensaje">Cargando escenario...</p>
+        <button id="btn-siguiente" style="display:none;">Siguiente Nivel</button>
+    </div>
+
+    <!-- PANTALLA 3: RANKING GLOBAL EN TIEMPO REAL -->
+    <div id="pantalla-ranking" class="pantalla">
+        <h1>🏆 Tabla de Clasificación Global</h1>
+        <p>Los 10 tiempos más rápidos en completar todos los niveles:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Posición</th>
+                    <th>Detective</th>
+                    <th>Tiempo Total</th>
+                </tr>
+            </thead>
+            <tbody id="cuerpo-tabla">
+                <tr><td colspan="3">Sincronizando con Firebase...</td></tr>
+            </tbody>
+        </table>
+        <button id="btn-reiniciar">Volver a Jugar</button>
+    </div>
+
+    <!-- INTEGRACIÓN DE CONFIGURACIÓN Y LÓGICA DE FIREBASE -->
+    <script type="module">
+        import { initializeApp } from "https://gstatic.com";
+        import { getDatabase, ref, push, set, onValue, query, orderByChild, limitToFirst } 
+        from "https://gstatic.com";
+
+        // ==========================================
+        // REEMPLAZA ESTOS DATOS CON TU PROYECTO DE FIREBASE
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_://firebaseapp.com",
+            databaseURL: "https://TU_://firebaseio.com",
+            projectId: "TU_PROYECTO",
+            storageBucket: "TU_://appspot.com",
+            messagingSenderId: "TU_ID",
+            appId: "TU_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // ==========================================
+        // CONFIGURACIÓN DE LOS IMPACTOS (X, Y en %)
+        // ==========================================
+        const niveles = [
+            { nivel: 1, impactoX: 50, impactoY: 30, radioPermitido: 12, pista: "Busca luces encendidas innecesariamente en la oficina de día.", imagen: "https://picsum.photos" },
+            { nivel: 2, impactoX: 75, impactoY: 60, radioPermitido: 8, pista: "Busca un grifo goteando y desperdiciando agua en el hogar.", imagen: "https://picsum.photos" },
+            { nivel: 3, impactoX: 25, impactoY: 45, radioPermitido: 5, pista: "Busca aparatos en stand-by consumiendo energía vampiro en la oficina.", imagen: "https://picsum.photos" }
+        ];
+
+        let nombreJugador = "";
+        let nivelActual = 0;
+        let nivelCompletado = false;
+        let tiempoInicio;
+        let intervaloTiempo;
+        let tiempoTotalAcumulado = 0;
+        let penalizacionTiempo = 0;
+
+        document.getElementById("btn-iniciar").onclick = iniciarJuego;
+        document.getElementById("btn-siguiente").onclick = siguienteNivel;
+        document.getElementById("btn-reiniciar").onclick = reiniciarTodo;
+        document.getElementById("imagen-escenario").onclick = registrarClic;
+
+        function iniciarJuego() {
+            nombreJugador = document.getElementById("nombre-jugador").value.trim();
+            if (!nombreJugador) return alert("Por favor, ingresa tu nombre de detective.");
+            
+            cambiarPantalla("pantalla-juego");
+            nivelActual = 0;
+            tiempoTotalAcumulado = 0;
+            penalizacionTiempo = 0;
+            cargarNivel();
+        }
+
+        function cargarNivel() {
+            nivelCompletado = false;
+            document.getElementById("btn-siguiente").style.display = "none";
+            
+            const datos = niveles[nivelActual];
+            document.getElementById("info-nivel").innerText = `Nivel: ${datos.nivel} de ${niveles.length}`;
+            document.getElementById("mensaje").innerText = `Pista: ${datos.pista}`;
+            document.getElementById("imagen-escenario").src = datos.imagen;
+            
+            document.querySelectorAll('.marcador').forEach(m => m.remove());
+
+            tiempoInicio = performance.now();
+            intervaloTiempo = setInterval(() => {
+                let tiempoActual = (performance.now() - tiempoInicio) / 1000;
+                let tiempoDesplegado = tiempoTotalAcumulado + tiempoActual + penalizacionTiempo;
+                document.getElementById("cronometro").innerText = tiempoDesplegado.toFixed(2) + "s";
+            }, 40);
+        }
+
+        function registrarClic(event) {
+            if (nivelCompletado) return;
+
+            const img = document.getElementById("imagen-escenario");
+            const rect = img.getBoundingClientRect();
+            const clickX = ((event.clientX - rect.left) / rect.width) * 100;
+            const clickY = ((event.clientY - rect.top) / rect.height) * 100;
+
+            const datos = niveles[nivelActual];
+            const distancia = Math.sqrt(Math.pow(clickX - datos.impactoX, 2) + Math.pow(clickY - datos.impactoY, 2));
+
+            const marcador = document.createElement("div");
+            marcador.classList.add("marcador");
+            marcador.style.left = `${clickX}%`;
+            marcador.style.top = `${clickY}%`;
+            marcador.style.width = `${datos.radioPermitido * 2}%`;
+            marcador.style.height = `${datos.radioPermitido * 2 * (rect.width / rect.height)}%`;
+
+            if (distancia <= datos.radioPermitido) {
+                clearInterval(intervaloTiempo);
+                let tiempoNivel = (performance.now() - tiempoInicio) / 1000;
+                tiempoTotalAcumulado += tiempoNivel;
+
+                marcador.classList.add("correcto");
+                document.getElementById("mensaje").innerText = "¡Excelente hallazgo ambiental!";
+                nivelCompletado = true;
+                document.getElementById("btn-siguiente").style.display = "inline-block";
+            } else {
+                // Penalización por clic incorrecto
+                penalizacionTiempo += 3;
+                mostrarAlertaPenalizacion();
+                marcador.classList.add("incorrecto");
+                document.getElementById("mensaje").innerText = "No hay un impacto crítico ahí. ¡Intenta de nuevo!";
+            }
+            document.getElementById("contenedor-juego").appendChild(marcador);
+        }
+
+        function mostrarAlertaPenalizacion() {
+            const alerta = document.getElementById("alerta-penalizacion");
+            alerta.style.display = "block";
+            setTimeout(() => { alerta.style.display = "none"; }, 600);
+        }
+
+        function siguienteNivel() {
+            if (nivelActual < niveles.length - 1) {
+                nivelActual++;
+                cargarNivel();
+            } else {
+                guardarPuntajeFirebase();
+            }
+        }
+
+        function guardarPuntajeFirebase() {
+            document.getElementById("mensaje").innerText = "Subiendo tu registro al ranking global de la nube...";
+            
+            const rankingRef = ref(db, 'ranking');
+ let tiempoFinal = tiempoTotalAcumulado + penalizacionTiempo;
+
+            set(nuevoPuntajeRef, {
+                nombre: nombreJugador,
+                tiempo: parseFloat(tiempoFinal.toFixed(2)),
+                fecha: new Date().toISOString()
+            }).then(() => {
+                cambiarPantalla("pantalla-ranking");
+            }).catch((error) => {
+                console.error("Error Firebase:", error);
+                cambiarPantalla("pantalla-ranking");
+            });
+        }
+
+        const consultaRanking = query(ref(db, 'ranking'), orderByChild('tiempo'), limitToFirst(10));
+        
+        onValue(consultaRanking, (snapshot) => {
+            const tbody = document.getElementById("cuerpo-tabla");
+            tbody.innerHTML = "";
+            
+            if (!snapshot.exists()) {
+                tbody.innerHTML = "<tr><td colspan='3'>¡Sé el primero en establecer un récord!</td></tr>";
+                return;
+            }
+
+            let posicion = 1;
+            snapshot.forEach((childSnapshot) => {
+                const registro = childSnapshot.val();
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${posicion === 1 ? '🥇 1' : posicion === 2 ? '🥈 2' : posicion === 3 ? '🥉 3' : posicion}</td>
+                        <td><strong>${registro.nombre}</strong></td>
+                        <td>${registro.tiempo.toFixed(2)}s</td>
+                    </tr>`;
+                posicion++;
+            });
+        });
+
+        function cambiarPantalla(idPantalla) {
+            document.querySelectorAll('.pantalla').forEach(p => p.style.display = 'none');
+            document.getElementById(idPantalla).style.display = 'block';
+        }
+
+        function reiniciarTodo() {
+            document.getElementById("nombre-jugador").value = "";
+            document.querySelectorAll('.pantalla').forEach(p => p.style.display = 'none');
+            document.getElementById("pantalla-inicio").style.display = "block";
+        }
+    </script>
+</body>
+</html>
