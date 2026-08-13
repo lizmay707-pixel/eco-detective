@@ -68,11 +68,11 @@
     </div>
 
     <!-- INTEGRACIÓN DE CONFIGURACIÓN Y LÓGICA DE FIREBASE -->
-    <script type="module">
-        import { initializeApp } from "https://cloudflare.com";
-import { getDatabase, ref, push, set, onValue, query, orderByChild, limitToFirst } 
-from "https://cloudflare.com";
+   <!-- LIBRERÍAS CLÁSICAS DE FIREBASE (A PRUEBA DE BLOQUEOS CORS) -->
+    <script src="https://gstatic.com"></script>
+    <script src="https://gstatic.com"></script>
 
+    <script>
         // ==========================================
         // REEMPLAZA ESTOS DATOS CON TU PROYECTO DE FIREBASE
         // ==========================================
@@ -86,8 +86,9 @@ from "https://cloudflare.com";
             appId: "TU_APP_ID"
         };
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
+        // Inicializar Firebase clásico
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
         // ==========================================
         // CONFIGURACIÓN DE LOS IMPACTOS (X, Y en %)
@@ -106,6 +107,7 @@ from "https://cloudflare.com";
         let tiempoTotalAcumulado = 0;
         let penalizacionTiempo = 0;
 
+        // Asignar funciones a los botones manualmente
         document.getElementById("btn-iniciar").onclick = iniciarJuego;
         document.getElementById("btn-siguiente").onclick = siguienteNivel;
         document.getElementById("btn-reiniciar").onclick = reiniciarTodo;
@@ -169,7 +171,6 @@ from "https://cloudflare.com";
                 nivelCompletado = true;
                 document.getElementById("btn-siguiente").style.display = "inline-block";
             } else {
-                // Penalización por clic incorrecto
                 penalizacionTiempo += 3;
                 mostrarAlertaPenalizacion();
                 marcador.classList.add("incorrecto");
@@ -195,11 +196,9 @@ from "https://cloudflare.com";
 
         function guardarPuntajeFirebase() {
             document.getElementById("mensaje").innerText = "Subiendo tu registro al ranking global de la nube...";
-            
-            const rankingRef = ref(db, 'ranking');
- let tiempoFinal = tiempoTotalAcumulado + penalizacionTiempo;
+            let tiempoFinal = tiempoTotalAcumulado + penalizacionTiempo;
 
-            set(nuevoPuntajeRef, {
+            db.ref('ranking').push({
                 nombre: nombreJugador,
                 tiempo: parseFloat(tiempoFinal.toFixed(2)),
                 fecha: new Date().toISOString()
@@ -211,9 +210,8 @@ from "https://cloudflare.com";
             });
         }
 
-        const consultaRanking = query(ref(db, 'ranking'), orderByChild('tiempo'), limitToFirst(10));
-        
-        onValue(consultaRanking, (snapshot) => {
+        // Cargar y ordenar Top 10 en tiempo real usando Firebase clásico
+        db.ref('ranking').orderByChild('tiempo').limitToFirst(10).on('value', (snapshot) => {
             const tbody = document.getElementById("cuerpo-tabla");
             tbody.innerHTML = "";
             
@@ -242,8 +240,7 @@ from "https://cloudflare.com";
 
         function reiniciarTodo() {
             document.getElementById("nombre-jugador").value = "";
-            document.querySelectorAll('.pantalla').forEach(p => p.style.display = 'none');
-            document.getElementById("pantalla-inicio").style.display = "block";
+            cambiarPantalla("pantalla-inicio");
         }
     </script>
 </body>
